@@ -58,7 +58,9 @@
 #include "xdgdir.h"
 #include "connectserverdialog.h"
 
+#ifndef Q_OS_MACOS
 #include <X11/Xlib.h>
+#endif
 
 
 namespace PCManFM {
@@ -102,6 +104,16 @@ Application::Application(int& argc, char** argv):
 
     underWayland_ = QGuiApplication::platformName() == QStringLiteral("wayland");
 
+#ifdef Q_OS_MACOS
+    // macOS has no session D-Bus. QDBusConnection::sessionBus() would never own
+    // the service name, which makes the application believe that another
+    // instance is running and quit immediately. Always run as the primary
+    // instance and skip the freedesktop.org service registration.
+    isPrimaryInstance = true;
+    setStyle(new ProxyStyle());
+    connect(this, &Application::aboutToQuit, this, &Application::onAboutToQuit);
+    installSigtermHandler();
+#else
     // QDBusConnection::sessionBus().registerObject("/org/pcmanfm/Application", this);
     QDBusConnection dbus = QDBusConnection::sessionBus();
     if(dbus.registerService(QLatin1String(serviceName))) {
@@ -153,6 +165,7 @@ Application::Application(int& argc, char** argv):
         // we're not the first instance
         isPrimaryInstance = false;
     }
+#endif
 }
 
 Application::~Application() {
@@ -881,6 +894,11 @@ void Application::editBookmarks() {
 }
 
 void Application::initVolumeManager() {
+
+    // macOS has no gvfs: g_volume_monitor_get() may return nullptr there.
+    if(!volumeMonitor_) {
+        return;
+    }
 
     g_signal_connect(volumeMonitor_, "volume-added", G_CALLBACK(onVolumeAdded), this);
 

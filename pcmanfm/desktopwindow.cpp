@@ -45,8 +45,10 @@
 
 #include <algorithm>
 
+#ifndef Q_OS_MACOS
 #include <LayerShellQt/shell.h>
 #include <LayerShellQt/window.h>
+#endif
 
 #include "./application.h"
 #include "mainwindow.h"
@@ -64,8 +66,10 @@
 #include "desktopentrydialog.h"
 
 #include <QScreen>
+#ifndef Q_OS_MACOS
 #include <xcb/xcb.h>
 #include <X11/Xlib.h>
+#endif
 
 #define MIN_SLIDE_INTERVAL 5*60000 // 5 min
 #define MAX_SLIDE_INTERVAL (24*60+55)*60000 // 24 h and 55 min
@@ -199,6 +203,7 @@ DesktopWindow::DesktopWindow(int screenNum, const QString& screenName):
     shortcut = new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_Delete), this); // force delete
     connect(shortcut, &QShortcut::activated, this, &DesktopWindow::onDeleteActivated);
 
+#ifndef Q_OS_MACOS
     // under Wayland, set the layer and anchors as well as window transparency
     if(static_cast<Application*>(qApp)->underWayland()) {
         setAttribute(Qt::WA_TranslucentBackground);
@@ -227,6 +232,7 @@ DesktopWindow::DesktopWindow(int screenNum, const QString& screenName):
             }
         }
     }
+#endif
 }
 
 DesktopWindow::~DesktopWindow() {
@@ -1934,6 +1940,7 @@ bool DesktopWindow::event(QEvent* event) {
         if(effectiveWinId() == 0) {
             break;
         }
+#ifndef Q_OS_MACOS
         // set freedesktop.org EWMH hints properly
         if(QGuiApplication::platformName() == QStringLiteral("xcb")) {
             if(auto x11NativeInterfce = qApp->nativeInterface<QNativeInterface::QX11Application>()) {
@@ -1946,6 +1953,7 @@ bool DesktopWindow::event(QEvent* event) {
                 xcb_change_property(con, XCB_PROP_MODE_REPLACE, effectiveWinId(), prop_atom, XA_ATOM, 32, 1, &atom);
             }
         }
+#endif
         break;
     }
 #undef FontChange // FontChange is defined in the headers of XLib and clashes with Qt, let's undefine it.

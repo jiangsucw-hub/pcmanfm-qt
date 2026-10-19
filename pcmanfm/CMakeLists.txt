@@ -82,17 +82,38 @@ target_compile_definitions(pcmanfm-qt
         LIBFM_DATA_DIR="${PKG_FM_PREFIX}/share/libfm"
 )
 
-target_include_directories(pcmanfm-qt
-    PRIVATE
-        "${Qt6Gui_PRIVATE_INCLUDE_DIRS}"
-)
+if(Qt6Gui_PRIVATE_INCLUDE_DIRS)
+    target_include_directories(pcmanfm-qt
+        PRIVATE
+            ${Qt6Gui_PRIVATE_INCLUDE_DIRS}
+    )
+endif()
+
+set(pcmanfm_PLATFORM_LIBS)
+if(NOT APPLE)
+    list(APPEND pcmanfm_PLATFORM_LIBS LayerShellQtInterface)
+endif()
 
 target_link_libraries(pcmanfm-qt
     Qt6::Widgets
     Qt6::DBus
-    LayerShellQtInterface
+    ${pcmanfm_PLATFORM_LIBS}
     fm-qt6
 )
+
+if(APPLE)
+    set_target_properties(pcmanfm-qt PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "PCManFM-Qt"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "org.pcmanfm.qt"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PCMANFM_QT_VERSION}"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PCMANFM_QT_VERSION}"
+        MACOSX_BUNDLE_INFO_STRING "PCManFM-Qt ${PCMANFM_QT_VERSION}"
+    )
+    install(TARGETS pcmanfm-qt BUNDLE DESTINATION ".")
+else()
+    install(TARGETS pcmanfm-qt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 
 install(TARGETS pcmanfm-qt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 

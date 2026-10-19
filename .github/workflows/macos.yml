@@ -1,0 +1,120 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: [macos]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Create a GitHub release with the .dmg'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  DEPS: ${{ github.workspace }}/deps
+  STAGE: ${{ github.workspace }}/stage
+
+jobs:
+  build:
+    name: macOS (arm64)
+    runs-on: macos-14
+    steps:
+      - name: Checkout pcmanfm-qt
+        uses: actions/checkout@v4
+
+      - name: Install Homebrew dependencies
+        run: |
+          set -eux
+          brew install cmake ninja pkg-config glib libexif gettext shared-mime-info
+          pkg-config --modversion glib-2.0 gio-2.0 gio-unix-2.0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.1'
+          cache: true
+
+      - name: Build lxqt-build-tools and lxqt-menu-data
+        run: |
+          set -eux
+          mkdir -p "$DEPS"
+          for repo in lxqt-build-tools lxqt-menu-data; do
+            curl -fsSL "https://github.com/lxqt/${repo}/archive/refs/tags/2.4.0.tar.gz" -o "/tmp/${repo}.tar.gz"
+            rm -rf "/tmp/${repo}" && mkdir -p "/tmp/${repo}"
+            tar xzf "/tmp/${repo}.tar.gz" -C "/tmp/${repo}" --strip-components=1
+            cmake -S "/tmp/${repo}" -B "/tmp/${repo}/build" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX="$DEPS" \
+              -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+            cmake --build "/tmp/${repo}/build" --target install
+          done
+
+      - name: Build libfm-qt
+        run: |
+          set -eux
+          git clone --depth 1 --branch macos "https://github.com/${{ github.repository_owner }}/libfm-qt.git" /tmp/libfm-qt
+          cmake -S /tmp/libfm-qt -B /tmp/libfm-qt/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$DEPS" \
+            -DCMAKE_PREFIX_PATH="$DEPS;$QT_ROOT_DIR"
+          cmake --build /tmp/libfm-qt/build -j "$(sysctl -n hw.ncpu)"
+          cmake --install /tmp/libfm-qt/build
+
+      - name: Build pcmanfm-qt
+        run: |
+          set -eux
+          export PKG_CONFIG_PATH="$DEPS/lib/pkgconfig:$PKG_CONFIG_PATH"
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$STAGE" \
+            -DCMAKE_PREFIX_PATH="$DEPS;$QT_ROOT_DIR"
+          cmake --build build -j "$(sysctl -n hw.ncpu)"
+          cmake --install build
+
+      - name: Package .app and .dmg
+        run: |
+          set -eux
+          APP="$(find "$STAGE" -maxdepth 1 -name '*.app' | head -n 1)"
+          test -n "$APP"
+          # ship translations and other data inside the bundle
+          if [ -d "$STAGE/share" ]; then
+            mkdir -p "$APP/Contents/Resources/share"
+            cp -R "$STAGE/share/." "$APP/Contents/Resources/share/"
+          fi
+          macdeployqt "$APP" \
+            -libpath="$DEPS/lib" \
+            -libpath="$(brew --prefix)/lib" \
+            -always-overwrite \
+            -verbose=1
+          macdeployqt "$APP" -dmg -always-overwrite -verbose=1
+          DMG="$(find "$(dirname "$APP")" -maxdepth 1 -name '*.dmg' | head -n 1)"
+          mv "$DMG" "PCManFM-Qt-${GITHUB_SHA::7}.dmg"
+          ls -lh "PCManFM-Qt-${GITHUB_SHA::7}.dmg"
+          otool -L "$APP/Contents/MacOS/pcmanfm-qt"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PCManFM-Qt-macos-arm64
+          path: PCManFM-Qt-*.dmg
+          if-no-files-found: error
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('macos-{0}', github.run_number) }}
+          name: PCManFM-Qt macOS ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build {0}', github.run_number) }}
+          files: PCManFM-Qt-*.dmg
+          generate_release_notes: true
+
+      - name: Show build logs on failure
+        if: failure()
+        run: |
+          for log in build/CMakeFiles/CMakeError.log build/CMakeFiles/CMakeOutput.log; do
+            [ -f "$log" ] && tail -n 200 "$log" || true
+          done

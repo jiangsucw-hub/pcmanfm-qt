@@ -24,7 +24,12 @@ find_package(Qt6LinguistTools ${QT_MINIMUM_VERSION} REQUIRED)
 find_package(Qt6Widgets ${QT_MINIMUM_VERSION} REQUIRED)
 find_package(fm-qt6 ${LIBFMQT_MINIMUM_VERSION} REQUIRED)
 find_package(lxqt2-build-tools ${LXQTBT_MINIMUM_VERSION} REQUIRED)
-find_package(LayerShellQt ${SHELLQT_MINIMUM_VERSION} REQUIRED)
+if(NOT APPLE)
+    find_package(LayerShellQt ${SHELLQT_MINIMUM_VERSION} REQUIRED)
+else()
+    # LayerShellQt is a Wayland-only library and does not exist on macOS.
+    message(STATUS "Building on macOS: LayerShellQt (Wayland) support is disabled")
+endif()
 
 message(STATUS "Building ${PROJECT_NAME} with Qt ${Qt6Core_VERSION}")
 
