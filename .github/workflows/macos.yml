@@ -30,7 +30,12 @@ jobs:
         run: |
           set -eux
           brew install cmake ninja pkg-config glib libexif gettext shared-mime-info
-          pkg-config --modversion glib-2.0 gio-2.0 gio-unix-2.0
+          pkg-config --modversion glib-2.0 gio-2.0
+          # gettext is keg-only, but glib's gi18n-lib.h includes <libintl.h>
+          GETTEXT_PREFIX="$(brew --prefix gettext)"
+          echo "CFLAGS=-I$GETTEXT_PREFIX/include" >> "$GITHUB_ENV"
+          echo "CXXFLAGS=-I$GETTEXT_PREFIX/include" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$GETTEXT_PREFIX/lib" >> "$GITHUB_ENV"
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
