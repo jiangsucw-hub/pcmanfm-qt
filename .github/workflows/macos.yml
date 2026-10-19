@@ -71,10 +71,20 @@ jobs:
         run: |
           set -eux
           git clone --depth 1 --branch macos "https://github.com/${{ github.repository_owner }}/libfm-qt.git" /tmp/libfm-qt
+
+          # lxqt's FindGLIB looks for gio-unix-2.0 headers under a dedicated
+          # include/gio-unix-2.0 directory, which Homebrew's glib does not ship;
+          # it installs gio/gdesktopappinfo.h in the regular glib include dir.
+          GIO_UNIX_HEADER="$(find "$(pkg-config --variable=includedir glib-2.0)" -name gdesktopappinfo.h | head -n 1)"
+          test -n "$GIO_UNIX_HEADER"
+          GLIB_GIO_UNIX_INCLUDE_DIR="$(dirname "$(dirname "$GIO_UNIX_HEADER")")"
+          echo "gio-unix headers: $GLIB_GIO_UNIX_INCLUDE_DIR"
+
           cmake -S /tmp/libfm-qt -B /tmp/libfm-qt/build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$DEPS" \
-            -DCMAKE_PREFIX_PATH="$DEPS;$QT_ROOT_DIR"
+            -DCMAKE_PREFIX_PATH="$DEPS;$QT_ROOT_DIR" \
+            -DGLIB_GIO_UNIX_INCLUDE_DIR="$GLIB_GIO_UNIX_INCLUDE_DIR"
           cmake --build /tmp/libfm-qt/build -j "$(sysctl -n hw.ncpu)"
           cmake --install /tmp/libfm-qt/build
 
