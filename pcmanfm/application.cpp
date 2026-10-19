@@ -356,7 +356,14 @@ void Application::init() {
     installTranslator(libFm_.translator());
 
     // install our own tranlations
-    if(translator.load(QStringLiteral("pcmanfm-qt_") + QLocale::system().name(), QStringLiteral(PCMANFM_DATA_DIR) + QStringLiteral("/translations"))) {
+#ifdef Q_OS_MACOS
+    // Inside a macOS app bundle the data lives in Contents/Resources.
+    const QString translationsDir = QCoreApplication::applicationDirPath()
+                                    + QStringLiteral("/../Resources/share/pcmanfm-qt/translations");
+#else
+    const QString translationsDir = QStringLiteral(PCMANFM_DATA_DIR) + QStringLiteral("/translations");
+#endif
+    if(translator.load(QStringLiteral("pcmanfm-qt_") + QLocale::system().name(), translationsDir)) {
         installTranslator(&translator);
     }
 }
