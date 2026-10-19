@@ -29,7 +29,9 @@
 #include <QPoint>
 #include <QByteArray>
 #include <QScreen>
+#ifndef Q_OS_MACOS
 #include <xcb/xcb.h>
+#endif
 #include <libfm-qt6/core/folder.h>
 
 namespace Fm {
