@@ -20,8 +20,16 @@ env:
 
 jobs:
   build:
-    name: macOS (arm64)
-    runs-on: macos-14
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
     steps:
       - name: Checkout pcmanfm-qt
         uses: actions/checkout@v4
@@ -156,7 +164,7 @@ jobs:
           check_bundle() {
             local file="$1"
             local bad
-            bad="$(otool -L "$file" | tail -n +2 | grep -E "/opt/homebrew|/Users/|$DEPS" || true)"
+            bad="$(otool -L "$file" | tail -n +2 | grep -E "/opt/homebrew|/usr/local|/Users/|$DEPS" || true)"
             if [ -n "$bad" ]; then
               echo "ERROR: $file still depends on unbundled libraries:"
               echo "$bad"
@@ -168,7 +176,7 @@ jobs:
             [ -e "$lib" ] && check_bundle "$lib"
           done
 
-          # arm64 binaries must be signed, at least ad-hoc, to be executable
+          # the binary must be signed, at least ad-hoc, to be executable
           codesign --force --deep --sign - "$APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
           otool -l "$APP/Contents/MacOS/pcmanfm-qt" | grep -A2 LC_RPATH || true
@@ -179,8 +187,8 @@ jobs:
           DMGROOT="$(mktemp -d)"
           cp -R "$APP" "$DMGROOT/"
           ln -s /Applications "$DMGROOT/Applications"
-          DMG="PCManFM-Qt-${GITHUB_SHA::7}.dmg"
-          hdiutil create -volname "PCManFM-Qt" -srcfolder "$DMGROOT" -ov -format UDZO "$DMG"
+          DMG="PCManFM-Qt-${{ matrix.arch }}-${GITHUB_SHA::7}.dmg"
+          hdiutil create -volname "PCManFM-Qt (${{ matrix.arch }})" -srcfolder "$DMGROOT" -ov -format UDZO "$DMG"
           rm -rf "$DMGROOT"
           ls -lh "$DMG"
           otool -L "$APP/Contents/MacOS/pcmanfm-qt"
@@ -188,7 +196,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PCManFM-Qt-macos-arm64
+          name: PCManFM-Qt-macos-${{ matrix.arch }}
           path: PCManFM-Qt-*.dmg
           if-no-files-found: error
 
@@ -196,8 +204,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/') || inputs.publish == true
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('macos-{0}', github.run_number) }}
-          name: PCManFM-Qt macOS ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build {0}', github.run_number) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('macos-{0}-{1}', matrix.arch, github.run_number) }}
+          name: PCManFM-Qt macOS ${{ matrix.arch }} ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('build {0}', github.run_number) }}
           files: PCManFM-Qt-*.dmg
           generate_release_notes: true
 
