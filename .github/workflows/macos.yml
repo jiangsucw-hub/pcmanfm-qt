@@ -133,6 +133,17 @@ jobs:
             cp -R "$DEPS/share/libfm-qt" "$APP/Contents/Resources/share/"
           fi
 
+          # macOS ships no XDG icon theme, while libfm-qt resolves every icon
+          # (files, places, actions) by theme name. Bundle Breeze so the theme
+          # lookups succeed instead of falling back to one generic icon.
+          curl -fsSL "https://download.kde.org/stable/frameworks/6.21/breeze-icons-6.21.0.tar.xz" \
+            -o /tmp/breeze-icons.tar.xz
+          rm -rf /tmp/breeze-icons && mkdir -p /tmp/breeze-icons
+          tar xf /tmp/breeze-icons.tar.xz -C /tmp/breeze-icons --strip-components=1
+          python3 tools/make-breeze-icon-theme.py /tmp/breeze-icons/icons \
+            "$APP/Contents/Resources/share/icons/breeze"
+          ls "$APP/Contents/Resources/share/icons/breeze" | head -5
+
           # bundle Qt, libfm-qt and every Homebrew dependency into Contents/Frameworks
           macdeployqt "$APP" \
             -libpath="$DEPS/lib" \

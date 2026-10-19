@@ -35,6 +35,8 @@
 #include <QScreen>
 #include <QWindow>
 #include <QFileSystemWatcher>
+#include <QFileInfo>
+#include <QIcon>
 
 #include <algorithm>
 
@@ -80,6 +82,39 @@ int ProxyStyle::styleHint(StyleHint hint, const QStyleOption* option, const QWid
     return QProxyStyle::styleHint(hint, option, widget, returnData);
 }
 
+#ifdef Q_OS_MACOS
+// macOS has no XDG icon theme, while libfm-qt resolves every icon (files,
+// places, menu and toolbar actions) by theme name through QIcon::fromTheme().
+// Qt does not search the app bundle for themes either, so all lookups failed
+// and every item ended up with the same generic icon. The bundle ships Breeze
+// in Contents/Resources/share/icons, so register it and use it unless the
+// platform provides a real theme of its own.
+static void setupBundledIconTheme() {
+    const QString iconsDir = QDir::cleanPath(QCoreApplication::applicationDirPath()
+                                             + QStringLiteral("/../Resources/share/icons"));
+    if(!QFileInfo(iconsDir).isDir()) {
+        return;
+    }
+
+    QStringList paths = QIcon::themeSearchPaths();
+    if(!paths.contains(iconsDir)) {
+        paths.prepend(iconsDir);
+        QIcon::setThemeSearchPaths(paths);
+    }
+
+    const QString currentTheme = QIcon::themeName();
+    if(!currentTheme.isEmpty() && currentTheme != QLatin1String("hicolor")) {
+        return; // a real platform theme is available, leave it alone
+    }
+    for(const QString& themeName : {QStringLiteral("breeze"), QStringLiteral("breeze-dark")}) {
+        if(QFileInfo(iconsDir + QLatin1Char('/') + themeName + QStringLiteral("/index.theme")).exists()) {
+            QIcon::setThemeName(themeName);
+            return;
+        }
+    }
+}
+#endif
+
 Application::Application(int& argc, char** argv):
     QApplication(argc, argv),
     libFm_(),
@@ -97,6 +132,10 @@ Application::Application(int& argc, char** argv):
 
     argc_ = argc;
     argv_ = argv;
+
+#ifdef Q_OS_MACOS
+    setupBundledIconTheme();
+#endif
 
     setApplicationVersion(QStringLiteral(PCMANFM_QT_VERSION));
     setDesktopFileName(QStringLiteral("pcmanfm-qt"));
