@@ -97,14 +97,16 @@ jobs:
         run: |
           set -eux
           export PKG_CONFIG_PATH="$DEPS/lib/pkgconfig:$PKG_CONFIG_PATH"
-          # libfm-qt is referenced as @rpath/libfm-qt6.x.dylib; macdeployqt can
-          # only resolve that (and bundle it) if the binary carries an rpath
-          # that points at the staged dependency directory.
+          # libfm-qt is referenced as @rpath/libfm-qt6.x.dylib and Qt as
+          # @rpath/QtX.framework/...; macdeployqt can only resolve (and hence
+          # bundle and rewire) those if the binary carries rpaths pointing at
+          # the staged dependencies. The in-bundle rpath is added to the
+          # installed binary right after deployment.
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$STAGE" \
             -DCMAKE_PREFIX_PATH="$DEPS;$QT_ROOT_DIR" \
-            -DCMAKE_INSTALL_RPATH="$DEPS/lib"
+            -DCMAKE_INSTALL_RPATH="$DEPS/lib;$QT_ROOT_DIR/lib"
           cmake --build build -j "$(sysctl -n hw.ncpu)"
           cmake --install build
 
@@ -135,6 +137,21 @@ jobs:
           ls -1 "$APP/Contents/Frameworks" | head -40
           test -e "$APP/Contents/Frameworks/libfm-qt6."*.dylib
 
+          # Depend on the bundled copies only: add the in-bundle rpath and drop
+          # the absolute build-time ones so the .app is relocatable.
+          BIN="$APP/Contents/MacOS/pcmanfm-qt"
+          for rp in "$DEPS/lib" "$QT_ROOT_DIR/lib" "$(brew --prefix)/lib"; do
+            install_name_tool -delete_rpath "$rp" "$BIN" 2>/dev/null || true
+            for lib in "$APP/Contents/Frameworks/"*.dylib; do
+              [ -e "$lib" ] || continue
+              install_name_tool -delete_rpath "$rp" "$lib" 2>/dev/null || true
+            done
+          done
+          for bin in "$BIN" "$APP/Contents/Frameworks/"*.dylib; do
+            [ -e "$bin" ] || continue
+            install_name_tool -add_rpath "@executable_path/../Frameworks" "$bin" 2>/dev/null || true
+          done
+
           # the app must not depend on anything outside the bundle
           check_bundle() {
             local file="$1"
@@ -150,6 +167,11 @@ jobs:
           for lib in "$APP/Contents/Frameworks/"*.dylib; do
             [ -e "$lib" ] && check_bundle "$lib"
           done
+
+          # arm64 binaries must be signed, at least ad-hoc, to be executable
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          otool -l "$APP/Contents/MacOS/pcmanfm-qt" | grep -A2 LC_RPATH || true
 
           macdeployqt "$APP" -dmg -always-overwrite -verbose=1
           DMG="$(find "$(dirname "$APP")" -maxdepth 1 -name '*.dmg' | head -n 1)"
