@@ -173,10 +173,16 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$APP"
           otool -l "$APP/Contents/MacOS/pcmanfm-qt" | grep -A2 LC_RPATH || true
 
-          macdeployqt "$APP" -dmg -always-overwrite -verbose=1
-          DMG="$(find "$(dirname "$APP")" -maxdepth 1 -name '*.dmg' | head -n 1)"
-          mv "$DMG" "PCManFM-Qt-${GITHUB_SHA::7}.dmg"
-          ls -lh "PCManFM-Qt-${GITHUB_SHA::7}.dmg"
+          # Build the disk image ourselves: macdeployqt -dmg mirrors the build
+          # tree inside the image, hdiutil gives a clean volume with the app at
+          # its root plus the usual /Applications shortcut.
+          DMGROOT="$(mktemp -d)"
+          cp -R "$APP" "$DMGROOT/"
+          ln -s /Applications "$DMGROOT/Applications"
+          DMG="PCManFM-Qt-${GITHUB_SHA::7}.dmg"
+          hdiutil create -volname "PCManFM-Qt" -srcfolder "$DMGROOT" -ov -format UDZO "$DMG"
+          rm -rf "$DMGROOT"
+          ls -lh "$DMG"
           otool -L "$APP/Contents/MacOS/pcmanfm-qt"
 
       - name: Upload artifact
