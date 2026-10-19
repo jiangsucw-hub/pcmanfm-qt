@@ -115,8 +115,6 @@ else()
     install(TARGETS pcmanfm-qt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
-install(TARGETS pcmanfm-qt RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-
 # install a desktop entry file for pcmanfm-qt and desktop preferences
 install(FILES ${DESKTOP_FILES} DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
 )
