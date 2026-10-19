@@ -1118,7 +1118,8 @@ void Application::installSigtermHandler() {
 
         struct sigaction action;
         action.sa_handler = sigtermHandler;
-        ::sigemptyset(&action.sa_mask);
+        // sigemptyset() is a macro on macOS, so it cannot be qualified.
+        sigemptyset(&action.sa_mask);
         action.sa_flags = SA_RESTART;
         if(::sigaction(SIGTERM, &action, nullptr) != 0) {
             qWarning("Couldn't install SIGTERM handler");
