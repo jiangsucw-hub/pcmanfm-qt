@@ -35,7 +35,7 @@ jobs:
           GETTEXT_PREFIX="$(brew --prefix gettext)"
           echo "CFLAGS=-I$GETTEXT_PREFIX/include" >> "$GITHUB_ENV"
           echo "CXXFLAGS=-I$GETTEXT_PREFIX/include" >> "$GITHUB_ENV"
-          echo "LDFLAGS=-L$GETTEXT_PREFIX/lib" >> "$GITHUB_ENV"
+          echo "LDFLAGS=-L$GETTEXT_PREFIX/lib -lintl" >> "$GITHUB_ENV"
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
