@@ -127,6 +127,7 @@ jobs:
           macdeployqt "$APP" \
             -libpath="$DEPS/lib" \
             -libpath="$(brew --prefix)/lib" \
+            -libpath="$QT_ROOT_DIR/lib" \
             -always-overwrite \
             -verbose=1
 
@@ -138,7 +139,7 @@ jobs:
           check_bundle() {
             local file="$1"
             local bad
-            bad="$(otool -L "$file" | tail -n +2 | grep -E '/opt/homebrew|/Users/|'"${DEPS}"' || true)"
+            bad="$(otool -L "$file" | tail -n +2 | grep -E "/opt/homebrew|/Users/|$DEPS" || true)"
             if [ -n "$bad" ]; then
               echo "ERROR: $file still depends on unbundled libraries:"
               echo "$bad"
