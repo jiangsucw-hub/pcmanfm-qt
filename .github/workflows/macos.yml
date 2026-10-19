@@ -84,7 +84,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$DEPS" \
             -DCMAKE_PREFIX_PATH="$DEPS;$QT_ROOT_DIR" \
-            -DGLIB_GIO_UNIX_INCLUDE_DIR="$GLIB_GIO_UNIX_INCLUDE_DIR"
+            -DGLIB_GIO_UNIX_INCLUDE_DIR="$GLIB_INCLUDE_DIR"
           cmake --build /tmp/libfm-qt/build -j "$(sysctl -n hw.ncpu)"
           cmake --install /tmp/libfm-qt/build
 
