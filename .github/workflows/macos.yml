@@ -42,16 +42,30 @@ jobs:
         run: |
           set -eux
           mkdir -p "$DEPS"
-          for repo in lxqt-build-tools lxqt-menu-data; do
-            curl -fsSL "https://github.com/lxqt/${repo}/archive/refs/tags/2.4.0.tar.gz" -o "/tmp/${repo}.tar.gz"
-            rm -rf "/tmp/${repo}" && mkdir -p "/tmp/${repo}"
-            tar xzf "/tmp/${repo}.tar.gz" -C "/tmp/${repo}" --strip-components=1
-            cmake -S "/tmp/${repo}" -B "/tmp/${repo}/build" -G Ninja \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DCMAKE_INSTALL_PREFIX="$DEPS" \
-              -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
-            cmake --build "/tmp/${repo}/build" --target install
-          done
+
+          fetch() {
+            curl -fsSL "https://github.com/lxqt/$1/archive/refs/tags/2.4.0.tar.gz" -o "/tmp/$1.tar.gz"
+            rm -rf "/tmp/$1" && mkdir -p "/tmp/$1"
+            tar xzf "/tmp/$1.tar.gz" -C "/tmp/$1" --strip-components=1
+          }
+
+          # lxqt-build-tools hardcodes /etc/xdg for menu files, which is not
+          # writable on CI runners; point it into our staging prefix.
+          fetch lxqt-build-tools
+          cmake -S /tmp/lxqt-build-tools -B /tmp/lxqt-build-tools/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$DEPS" \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
+            -DLXQT_ETC_XDG_DIR="$DEPS/etc/xdg"
+          cmake --build /tmp/lxqt-build-tools/build --target install
+
+          fetch lxqt-menu-data
+          cmake -S /tmp/lxqt-menu-data -B /tmp/lxqt-menu-data/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$DEPS" \
+            -DCMAKE_PREFIX_PATH="$DEPS;$QT_ROOT_DIR" \
+            -DLXQT_ETC_XDG_DIR="$DEPS/etc/xdg"
+          cmake --build /tmp/lxqt-menu-data/build --target install
 
       - name: Build libfm-qt
         run: |
